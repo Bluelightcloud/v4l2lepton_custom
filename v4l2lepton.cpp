@@ -70,6 +70,12 @@ static void grab_frame() {
     uint16_t value;
     uint16_t minValue = 65535;
     uint16_t maxValue = 0;
+//--------------------------------------------------
+	uint16_t coldmaxValue = 29315;
+	uint16_t coldminValue = 27315;
+	float colddiff = coldmaxValue - coldminValue;
+	float coldscale = 255 / colddiff;
+//--------------------------------------------------
 
     for (int i = 0; i < FRAME_SIZE_UINT16; i++) {
         if (i % PACKET_SIZE_UINT16 < 2) {
@@ -90,9 +96,9 @@ static void grab_frame() {
         column = i % PACKET_SIZE_UINT16 - 2;
         row = i / PACKET_SIZE_UINT16;
     }
-	//maxValue = 31000;
-	//minValue = 30850;
-	//printf("maxValue = %u , minValue = %u \n", maxValue, minValue);
+	printf("maxValue = %u , minValue = %u \n", maxValue, minValue);
+	maxValue = 30980;
+	minValue = 30800;
 	
     float diff = maxValue - minValue;
     float scale = 255 / diff;
@@ -100,22 +106,31 @@ static void grab_frame() {
         if (i % PACKET_SIZE_UINT16 < 2) {
             continue;
         }
-        value = (frameBuffer[i] - minValue) * scale;
-        const int *colormap = colormap_special;
+    	
+    	const int *colormap = colormap_special;
         column = (i % PACKET_SIZE_UINT16) - 2;
         row = i / PACKET_SIZE_UINT16;
-
         // Set video buffer pixel to scaled colormap value
         int idx = row * width * 3 + column * 3;
-    	if (value > 255){
+    	
+    	if (frameBuffer[i] < coldmaxValue){
+    		value = (frameBuffer[i] - coldminValue) * coldscale;
+    		value = 255 - value;
     		vidsendbuf[idx + 0] = 0;
-        	vidsendbuf[idx + 1] = 255;
-        	vidsendbuf[idx + 2] = 0;
-    		continue;
+	        vidsendbuf[idx + 1] = 0;
+	        vidsendbuf[idx + 2] = value;
+    	}else{
+    		value = (frameBuffer[i] - minValue) * scale;
+    		if (value > 255){
+	    		vidsendbuf[idx + 0] = 0;
+	        	vidsendbuf[idx + 1] = 255;
+	        	vidsendbuf[idx + 2] = 0;
+	    		continue;
+    		}
+	        vidsendbuf[idx + 0] = colormap[3 * value];
+	        vidsendbuf[idx + 1] = colormap[3 * value + 1];
+	        vidsendbuf[idx + 2] = colormap[3 * value + 2];
     	}
-        vidsendbuf[idx + 0] = colormap[3 * value];
-        vidsendbuf[idx + 1] = colormap[3 * value + 1];
-        vidsendbuf[idx + 2] = colormap[3 * value + 2];
     }
 
     /*
@@ -259,3 +274,4 @@ int main(int argc, char **argv)
     close(v4l2sink);
     return 0;
 }
+
